@@ -15,11 +15,7 @@ if [[ ":${PROMPT_COMMAND}:" != *":__cd_rw_52x_record:"* ]]; then
     PROMPT_COMMAND="${PROMPT_COMMAND:+${PROMPT_COMMAND}:}__cd_rw_52x_record"
 fi
 cdrw_jump() {
-    local target
-    target=$(command cdrw --select)
-    if [ -n "$target" ]; then
-        cd "$target" || return 1
-    fi
+    eval "$(command cdrw --select)"
 }
 # <<< cd-rw-52x <<<
 """

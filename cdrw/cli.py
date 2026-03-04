@@ -29,10 +29,16 @@ def main() -> None:
     if not target:
         return
 
+    safe_path = target.replace("'", "'\\''")
+    cd_cmd = f"cd '{safe_path}'"
+
     if os.environ.get("TMUX"):
-        # In a tmux session: type the cd command into the current pane's prompt.
-        safe_path = target.replace("'", "'\\''")
-        subprocess.run(["tmux", "send-keys", f"cd '{safe_path}'"])
-    else:
-        # Shell function captures this and does `cd "$target"`.
-        print(target)
+        try:
+            # In a tmux session: type the cd command into the current pane's prompt.
+            subprocess.run(["tmux", "send-keys", cd_cmd])
+            return
+        except FileNotFoundError:
+            pass
+
+    # Print the cd command for the shell wrapper to eval.
+    print(cd_cmd)
