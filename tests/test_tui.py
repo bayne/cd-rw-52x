@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import cdrw.tui as tui_mod
-from cdrw.tui import _draw_row, _safe_addstr, _tui_main
+from cdrw.tui import _disambiguate_paths, _draw_row, _safe_addstr, _tui_main
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +97,40 @@ def _run_tui_with_keys(entries: list[dict], key_sequence: list[int]) -> str | No
         patch.object(_curses, "KEY_NPAGE", 338),
     ):
         return _tui_main(stdscr)
+
+
+# ---------------------------------------------------------------------------
+# _disambiguate_paths
+# ---------------------------------------------------------------------------
+
+class TestDisambiguatePaths:
+    def test_unique_basenames_unchanged(self):
+        paths = ["/home/user/alpha", "/home/user/beta"]
+        result = _disambiguate_paths(paths)
+        assert result["/home/user/alpha"] == "alpha"
+        assert result["/home/user/beta"] == "beta"
+
+    def test_duplicate_basenames_get_parent(self):
+        paths = ["/home/user/work/api", "/home/user/personal/api"]
+        result = _disambiguate_paths(paths)
+        assert result["/home/user/work/api"] == "work/api"
+        assert result["/home/user/personal/api"] == "personal/api"
+
+    def test_triple_duplicate_needs_two_levels(self):
+        paths = ["/a/x/api", "/b/x/api", "/c/y/api"]
+        result = _disambiguate_paths(paths)
+        # /a/x/api and /b/x/api both have parent "x", so need grandparent
+        assert result["/a/x/api"] == "a/x/api"
+        assert result["/b/x/api"] == "b/x/api"
+        # /c/y/api is unique at depth 2 ("y/api")
+        assert result["/c/y/api"] == "y/api"
+
+    def test_empty_list(self):
+        assert _disambiguate_paths([]) == {}
+
+    def test_single_entry(self):
+        result = _disambiguate_paths(["/foo/bar"])
+        assert result["/foo/bar"] == "bar"
 
 
 class TestTuiMain:

@@ -8,6 +8,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from collections import Counter
+
 from cdrw.fuzzy import fuzzy_match
 from cdrw.git_info import get_git_info
 from cdrw.history import load_entries
@@ -71,6 +73,31 @@ def run_tui() -> str | None:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _disambiguate_paths(paths: list[str]) -> dict[str, str]:
+    """Build display names by adding parent dirs until all names are unique."""
+    depth: dict[str, int] = {p: 1 for p in paths}
+
+    while True:
+        names: dict[str, str] = {}
+        for p in paths:
+            parts = Path(p).parts
+            d = depth[p]
+            names[p] = str(Path(*parts[-d:])) if d <= len(parts) else p
+
+        name_counts = Counter(names.values())
+
+        changed = False
+        for p in paths:
+            if name_counts[names[p]] > 1 and depth[p] < len(Path(p).parts):
+                depth[p] += 1
+                changed = True
+
+        if not changed:
+            break
+
+    return names
+
 
 def _safe_addstr(stdscr: curses.window, row: int, col: int, text: str, attr: int = 0) -> None:
     """Draw text, silently ignoring writes outside the screen boundary."""
@@ -159,6 +186,8 @@ def _tui_main(stdscr: curses.window) -> str | None:  # type: ignore[override]
     entries = load_entries()
     entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
 
+    display_names = _disambiguate_paths([e["path"] for e in entries])
+
     # Pre-warm git cache for the first screenful.
     git_cache: dict[str, str | None] = {}
     for entry in entries[:30]:
@@ -175,7 +204,7 @@ def _tui_main(stdscr: curses.window) -> str | None:  # type: ignore[override]
         if query:
             filtered: list[tuple[dict, list[int]]] = []
             for entry in entries:
-                name = Path(entry["path"]).name
+                name = display_names[entry["path"]]
                 ok, indices = fuzzy_match(query, name)
                 if ok:
                     filtered.append((entry, indices))
@@ -204,7 +233,7 @@ def _tui_main(stdscr: curses.window) -> str | None:  # type: ignore[override]
                 break
             entry, indices = filtered[idx]
             path = entry["path"]
-            name = Path(path).name
+            name = display_names[path]
 
             if path not in git_cache:
                 git_cache[path] = get_git_info(path)
