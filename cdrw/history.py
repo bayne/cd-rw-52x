@@ -38,7 +38,7 @@ def load_entries() -> list[dict]:
             try:
                 entry = json.loads(line)
                 path = entry.get("path", "")
-                if path:
+                if path and Path(path).is_dir():
                     seen[path] = entry
             except json.JSONDecodeError:
                 pass
